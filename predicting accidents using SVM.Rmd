@@ -1,0 +1,123 @@
+---
+title: "Predicting accidents using SVM"
+author: "Rickson Osebe"
+date: "11/9/2022"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Problem Statement:
+**Our goal is to predict whether an accident just reported involves an injury(MAX_SEV_IR = 1 or 2) or will not (MAX_SEV_IR = 0).**
+
+
+```{r include=FALSE}
+library(dplyr)
+library(caret)
+library(e1071)
+```
+
+
+### QUESTION 1
+**1. Load the data in R. Add a dummy variable to the data called INJURY that is equal to the value "yes" if MAX_SEV_IR = 1 or 2, and otherwise "no".**
+```{r, warning=FALSE}
+accidents = read.csv("accidents.csv")
+acc = accidents %>%
+  mutate(INJURY = ifelse(accidents$MAX_SEV_IR>0, "yes", "no"))
+acc$INJURY = as.factor(acc$INJURY)
+```
+
+
+We use an if else statement to add the dummy variable in R.
+
+
+### QUESTION 2
+**2. Using the information in the accidents data set, if an accident has just been reported and no further information is available, what should be the prediction (INJURY = Yes or No)? Why?**
+```{r}
+table(acc$INJURY)
+yes_prob = (nrow(acc %>% filter(INJURY == "yes"))/ nrow(acc))*100
+no_prob = (nrow(acc %>% filter(INJURY == "no"))/ nrow(acc))*100
+cat("\n")
+cat("\n")
+print(paste("yes_probability is", round(yes_prob, 4)))
+print(paste("no_probability is", round(no_prob, 4)))
+```
+
+
+Observing the yes and no probabilities it is clear that yes_probability tends to be higher. Therefore for a new accident we could classify it "INJURY = YES".
+
+
+### QUESTION 3
+**3. Review the variable types in this data set. Is there any need for converting any of the variables in the data? Why or why not? If conversion is needed, perform it at this step, otherwise move on to the next question (after providing the explanation).**
+
+```{r}
+str(acc)
+```
+
+
+Looking at the structure of our variables we don't have any problems. The variables are in integer form so our model can be trained efficiently. The Injury variable is the only one which is a factor, since this is a response variable we are not worried.
+
+
+### QUESTION 4
+**4. Partition the data into training and validation sets, by putting 80% of the observations into the training data set.**
+```{r}
+set.seed(42)
+train = createDataPartition(y=acc$INJURY, p=0.8, list = FALSE)
+
+train_acc= acc[train,]
+test_acc = acc[-train,] 
+
+print(paste("training dimimension:", dim(train_acc)))
+cat("\n")
+print(paste("testing dimimension:", dim(test_acc)))
+```
+
+
+The splitting can be clearly observed to be 80% training and 20% testing
+
+### QUESTION 5
+**5. In order to include only the variables that are available at the time of an accident(e.g., location and weather), keep only the following variables in the data set:HOUR_I_R, ALIGN_I, WRK_ZONE, WKDY_I_R, INT_HWY, LGTCON_I_R, PROFIL_I_R, SPD_LIM, SUR_CON, TRAF_CON_R, TRAF_WAY and WEATHER_R.**
+
+```{r warning=FALSE}
+cols_us = c("INJURY",  names(train_acc)[1], "ALCHL_I", "WRK_ZONE", "WKDY_I_R", "INT_HWY", "LGTCON_I_R", "PROFIL_I_R", "SPD_LIM", "SUR_COND", "TRAF_CON_R", "TRAF_WAY", "WEATHER_R")
+train_acc_select = train_acc %>% select(all_of(cols_us))
+test_acc_select = test_acc %>% select(all_of(cols_us))
+```
+
+
+Using select to only include the required variables.
+
+### QUESTION 6
+**6. Fit a Naive Bayes classifier using the training data and the predictors identified in above question (and INJURY as the response).**
+
+```{r}
+model <- naiveBayes(INJURY ~ ., data = train_acc_select)
+```
+
+
+### QUESTION 7
+**7. Print the results from the above model. What are the A-priori probabilities? Explain how are they calculated.**
+
+```{r}
+model
+```
+
+
+Priori probabilities are the logical estimation of an incedent probability.
+They are usually calculated using the following formula:
+      Priori = F / N
+      where: F is the number of desirable outcomes.
+             N is the number of all possible outcomes.
+           
+
+### QUESTION 8
+**8. Print the confusion matrix generated using the validation data. Is the Naive Bayes model performing better than no model? Explain using the numbers from the table.**
+
+```{r}
+confusionMatrix(test_acc_select$INJURY, predict(model, test_acc_select), positive = "yes")
+```
+
+
+For a no-model usually we assume to have an accuracy of 0.5, 50% chance of getting it correct or wrong. Observing our model accuracy and comparing to 0.5, it is slightly higher by around 4%.
+This accuracy is not desirable but it can be assumed to be great than no model at all. Looking further at the specificity and sensitivity the model does not achieve great values.
+This may be attributed to the lower accuracy due to the model missing predicting correctly both the negative and positive values.
